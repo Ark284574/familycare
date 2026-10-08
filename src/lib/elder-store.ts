@@ -50,12 +50,12 @@ export const dayKey = (d: Date) =>
 
 // Minutes since midnight for "HH:MM".
 export const toMin = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
+  const [h = 0, m = 0] = t.split(":").map(Number);
   return h * 60 + m;
 };
 
 export const prettyTime = (t: string) => {
-  const [h, m] = t.split(":").map(Number);
+  const [h = 0, m = 0] = t.split(":").map(Number);
   const ampm = h >= 12 ? "PM" : "AM";
   return `${((h + 11) % 12) + 1}:${String(m).padStart(2, "0")} ${ampm}`;
 };
