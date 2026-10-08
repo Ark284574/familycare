@@ -1,24 +1,36 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { HeartHandshake, Users } from "lucide-react";
 
-// No head() here: the home route inherits title/description/og/twitter from
-// __root.tsx, and ships no og:image so serve-time hosting can inject the
-// project's social preview (explicit og:image or latest screenshot).
 export const Route = createFileRoute("/")({
+  head: () => ({
+    meta: [
+      { title: "FamilyCare — Gentle medicine reminders for elders" },
+      { name: "description", content: "FamilyCare helps elders take medicines on time and lets family check in without tracking." },
+      { property: "og:title", content: "FamilyCare — Gentle medicine reminders for elders" },
+      { property: "og:description", content: "Big, simple reminders for elders. Calm, private check-ins for family." },
+    ],
+  }),
   component: Index,
 });
 
-// IMPORTANT: Replace this placeholder. See ./README.md for routing conventions.
 function Index() {
   return (
-    <div
-      className="flex min-h-screen items-center justify-center"
-      style={{ backgroundColor: "#fcfbf8" }}
-    >
-      <img
-        data-lovable-blank-page-placeholder="REMOVE_THIS"
-        src="https://cdn.gpteng.co/blank-app-v1.svg"
-        alt="Your app will live here!"
-      />
-    </div>
+    <main className="mx-auto flex min-h-screen max-w-xl flex-col justify-center gap-6 bg-background p-6 text-foreground">
+      <div>
+        <HeartHandshake className="h-14 w-14 text-primary" strokeWidth={2.5} />
+        <h1 className="mt-3 text-elder-xl font-extrabold">FamilyCare</h1>
+        <p className="mt-2 text-elder-sm text-muted-foreground">Medicines on time. Family at peace. Privacy kept.</p>
+      </div>
+      <Link to="/elder" className="rounded-3xl bg-success p-8 text-center text-elder-lg font-extrabold text-success-foreground shadow-lg">
+        I am the Elder
+      </Link>
+      <div className="flex items-center gap-4 rounded-3xl border-4 border-dashed border-border p-6 text-muted-foreground">
+        <Users className="h-10 w-10" />
+        <div>
+          <p className="text-elder-sm font-bold">I am Family</p>
+          <p className="text-base">Coming in the next step: sign in, pairing and live dashboard.</p>
+        </div>
+      </div>
+    </main>
   );
 }
