@@ -14,7 +14,157 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      dose_events: {
+        Row: {
+          confirmed_at: string
+          day: string
+          elder_id: string
+          id: string
+          medicine_id: string
+        }
+        Insert: {
+          confirmed_at?: string
+          day: string
+          elder_id: string
+          id?: string
+          medicine_id: string
+        }
+        Update: {
+          confirmed_at?: string
+          day?: string
+          elder_id?: string
+          id?: string
+          medicine_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "dose_events_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: false
+            referencedRelation: "elders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "dose_events_medicine_id_fkey"
+            columns: ["medicine_id"]
+            isOneToOne: false
+            referencedRelation: "medicines"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      elders: {
+        Row: {
+          created_at: string
+          device_token: string
+          id: string
+          last_active_at: string | null
+          last_checkin_date: string | null
+          name: string
+          owner_id: string
+          paired_at: string | null
+          pairing_code: string
+          sharing_paused: boolean
+        }
+        Insert: {
+          created_at?: string
+          device_token?: string
+          id?: string
+          last_active_at?: string | null
+          last_checkin_date?: string | null
+          name: string
+          owner_id: string
+          paired_at?: string | null
+          pairing_code?: string
+          sharing_paused?: boolean
+        }
+        Update: {
+          created_at?: string
+          device_token?: string
+          id?: string
+          last_active_at?: string | null
+          last_checkin_date?: string | null
+          name?: string
+          owner_id?: string
+          paired_at?: string | null
+          pairing_code?: string
+          sharing_paused?: boolean
+        }
+        Relationships: []
+      }
+      medicines: {
+        Row: {
+          color: string
+          created_at: string
+          dose: string
+          elder_id: string
+          id: string
+          name: string
+          note: string
+          pills_remaining: number
+          time: string
+        }
+        Insert: {
+          color?: string
+          created_at?: string
+          dose?: string
+          elder_id: string
+          id?: string
+          name: string
+          note?: string
+          pills_remaining?: number
+          time: string
+        }
+        Update: {
+          color?: string
+          created_at?: string
+          dose?: string
+          elder_id?: string
+          id?: string
+          name?: string
+          note?: string
+          pills_remaining?: number
+          time?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "medicines_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: false
+            referencedRelation: "elders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      sos_events: {
+        Row: {
+          created_at: string
+          elder_id: string
+          id: string
+          resolved: boolean
+        }
+        Insert: {
+          created_at?: string
+          elder_id: string
+          id?: string
+          resolved?: boolean
+        }
+        Update: {
+          created_at?: string
+          elder_id?: string
+          id?: string
+          resolved?: boolean
+        }
+        Relationships: [
+          {
+            foreignKeyName: "sos_events_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: false
+            referencedRelation: "elders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
