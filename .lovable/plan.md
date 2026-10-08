@@ -1,4 +1,4 @@
-# CareCircle MVP — Build Plan
+# FamilyCare MVP — Build Plan
 
 An installable phone web app with two modes (Elder and Family). Data and logins run on Lovable Cloud. Spoken reminders are in English.
 
