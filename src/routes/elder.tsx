@@ -1,17 +1,21 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Sun, CloudSun, Moon, Check, ShieldCheck, Heart } from "lucide-react";
 import {
   SAMPLE_MEDICINES,
-  type ElderState,
+  type Medicine,
   type Slot,
-  emptyState,
-  loadState,
-  saveState,
+  emptyDemo,
+  loadDemo,
+  saveDemo,
+  getDeviceToken,
+  setDeviceToken,
+  slotOf,
   dayKey,
   toMin,
   prettyTime,
 } from "@/lib/elder-store";
+import { getElderToday, confirmDose, checkIn, sendSos, setSharingPaused } from "@/lib/elder.functions";
 import { speak, chime } from "@/lib/speech";
 
 export const Route = createFileRoute("/elder")({
@@ -28,28 +32,51 @@ export const Route = createFileRoute("/elder")({
 
 const SLOT_ICON: Record<Slot, typeof Sun> = { Morning: Sun, Afternoon: CloudSun, Night: Moon };
 
+// Everything the screen needs, whether it comes from the cloud or the demo.
+type Today = { name: string | null; meds: Medicine[]; confirmed: Record<string, string>; checkedIn: boolean; paused: boolean };
+
 function ElderScreen() {
-  const [state, setState] = useState<ElderState>(emptyState);
+  const [token, setToken] = useState<string | null>(null);
+  const [today, setToday] = useState<Today>({ name: null, meds: [], confirmed: {}, checkedIn: false, paused: false });
   const [now, setNow] = useState(() => new Date());
+  const [offset, setOffset] = useState(0); // demo only: shifts the clock forward (minutes)
   const [view, setView] = useState<"home" | "privacy">("home");
   const [sosSent, setSosSent] = useState(false);
-  const spokenRef = useRef<Record<string, number>>({}); // which reminder stage was spoken per dose
+  const spokenRef = useRef<Record<string, number>>({});
 
-  // Load saved state after the page opens (on the phone only).
-  useEffect(() => setState(loadState()), []);
-  const update = (s: ElderState) => {
-    setState(s);
-    saveState(s);
-  };
-
-  // Tick every 15 seconds. The demo offset lets you jump to a dose time.
-  useEffect(() => {
-    const id = setInterval(() => setNow(new Date()), 15000);
-    return () => clearInterval(id);
-  }, []);
-  const clock = new Date(now.getTime() + state.demoOffsetMin * 60000);
-  const today = dayKey(clock);
+  const clock = new Date(now.getTime() + offset * 60000);
+  const day = dayKey(clock);
   const nowMin = clock.getHours() * 60 + clock.getMinutes();
+
+  // Load data: from the cloud if paired, otherwise the on-phone demo.
+  const refresh = useCallback(async () => {
+    const t = getDeviceToken();
+    setToken(t);
+    if (t) {
+      try {
+        const r = await getElderToday({ data: { deviceToken: t, day } });
+        setToday({ name: r.name, meds: r.medicines, confirmed: r.confirmed, checkedIn: r.checkedIn, paused: r.paused });
+      } catch {
+        setDeviceToken(null); // pairing was removed by family
+        setToken(null);
+      }
+    } else {
+      const d = loadDemo();
+      const confirmed = Object.fromEntries(
+        Object.entries(d.confirmed).filter(([k]) => k.startsWith(day)).map(([k, v]) => [k.slice(11), v]),
+      );
+      setToday({ name: null, meds: SAMPLE_MEDICINES, confirmed, checkedIn: d.lastCheckin === day, paused: d.paused });
+    }
+  }, [day]);
+
+  useEffect(() => void refresh(), [refresh]);
+
+  // Tick every 15 s; re-sync with the cloud every minute (picks up family edits).
+  useEffect(() => {
+    const a = setInterval(() => setNow(new Date()), 15000);
+    const b = setInterval(() => void refresh(), 60000);
+    return () => { clearInterval(a); clearInterval(b); };
+  }, [refresh]);
 
   // Keep the screen awake so spoken reminders can play.
   useEffect(() => {
@@ -59,41 +86,51 @@ function ElderScreen() {
     return () => void lock?.release();
   }, []);
 
-  const meds = [...SAMPLE_MEDICINES].sort((a, b) => toMin(a.time) - toMin(b.time));
-  const isDone = (id: string) => Boolean(state.confirmed[`${today}_${id}`]);
-  // The dose to show: the earliest one today that is not confirmed yet.
+  const meds = [...today.meds].sort((a, b) => toMin(a.time) - toMin(b.time));
+  const isDone = (id: string) => Boolean(today.confirmed[id]);
   const current = meds.find((m) => !isDone(m.id));
   const due = current ? nowMin >= toMin(current.time) : false;
-  const nextAfter = (id: string) => meds.find((m) => m.id !== id && !isDone(m.id));
 
-  // Escalating reminders: at dose time, after 10 min, then louder after 20 min.
+  // Escalating reminders: at dose time, after 10 min, louder after 20 min.
   useEffect(() => {
     if (!current || !due) return;
     const late = nowMin - toMin(current.time);
     const stage = late >= 20 ? 3 : late >= 10 ? 2 : 1;
-    const key = `${today}_${current.id}`;
+    const key = `${day}_${current.id}`;
     if ((spokenRef.current[key] ?? 0) >= stage) return;
     spokenRef.current[key] = stage;
     if (stage === 3) chime();
-    speak(
-      `${stage > 1 ? "Reminder. " : ""}It is time for your ${current.name}. ${current.dose}. Press the green button when you have taken it.`,
-      stage === 3,
-    );
-  }, [current, due, nowMin, today]);
+    speak(`${stage > 1 ? "Reminder. " : ""}It is time for your ${current.name}. ${current.dose}. Press the green button when you have taken it.`, stage === 3);
+  }, [current, due, nowMin, day]);
 
-  const confirm = () => {
+  const confirm = async () => {
     if (!current || isDone(current.id)) return; // locked: cannot confirm twice
-    update({ ...state, confirmed: { ...state.confirmed, [`${today}_${current.id}`]: new Date().toISOString() } });
-    const next = nextAfter(current.id);
+    const med = current;
+    // Show it immediately, then save.
+    setToday((t) => ({ ...t, confirmed: { ...t.confirmed, [med.id]: new Date().toISOString() } }));
+    const next = meds.find((m) => m.id !== med.id && !isDone(m.id));
     speak(next ? `Done. Next medicine at ${prettyTime(next.time)}.` : "Done. All medicines taken for today.");
+    if (token) await confirmDose({ data: { deviceToken: token, day, medicineId: med.id } });
+    else { const d = loadDemo(); saveDemo({ ...d, confirmed: { ...d.confirmed, [`${day}_${med.id}`]: new Date().toISOString() } }); }
+  };
+
+  const doCheckIn = async () => {
+    setToday((t) => ({ ...t, checkedIn: true }));
+    speak("Thank you. Your family knows you are okay.");
+    if (token) await checkIn({ data: { deviceToken: token, day } });
+    else saveDemo({ ...loadDemo(), lastCheckin: day });
+  };
+
+  const togglePause = async () => {
+    const paused = !today.paused;
+    setToday((t) => ({ ...t, paused }));
+    if (token) await setSharingPaused({ data: { deviceToken: token, paused } });
+    else saveDemo({ ...loadDemo(), paused });
   };
 
   const lastDone = [...meds].reverse().find((m) => isDone(m.id));
-  const checkedIn = state.lastCheckin === today;
 
-  if (view === "privacy") {
-    return <PrivacyView paused={state.paused} onToggle={() => update({ ...state, paused: !state.paused })} onBack={() => setView("home")} />;
-  }
+  if (view === "privacy") return <PrivacyView paused={today.paused} onToggle={togglePause} onBack={() => setView("home")} />;
 
   return (
     <main className="mx-auto flex min-h-screen max-w-xl flex-col gap-5 bg-background p-5 text-foreground">
@@ -101,13 +138,13 @@ function ElderScreen() {
         <p className="text-elder-md font-bold">{clock.toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</p>
         <p className="text-elder-sm text-muted-foreground">{clock.toLocaleDateString([], { weekday: "long", day: "numeric", month: "long" })}</p>
       </header>
+      {today.name && <p className="text-elder-md font-bold">Hello, {today.name}</p>}
 
-      {/* Morning / Afternoon / Night overview */}
       <section className="grid grid-cols-3 gap-3">
         {(["Morning", "Afternoon", "Night"] as Slot[]).map((slot) => {
           const Icon = SLOT_ICON[slot];
-          const list = meds.filter((m) => m.slot === slot);
-          const allDone = list.every((m) => isDone(m.id));
+          const list = meds.filter((m) => slotOf(m.time) === slot);
+          const allDone = list.length > 0 && list.every((m) => isDone(m.id));
           return (
             <div key={slot} className={`flex flex-col items-center rounded-2xl border-4 p-3 ${allDone ? "border-success bg-success/15" : "border-border bg-card"}`}>
               <Icon className="h-12 w-12" strokeWidth={2.5} />
@@ -118,7 +155,6 @@ function ElderScreen() {
         })}
       </section>
 
-      {/* Current dose card + I TOOK IT */}
       {current ? (
         <section className="flex flex-col items-center gap-4 rounded-3xl border-4 border-foreground bg-card p-6 text-center">
           <p className="text-elder-sm font-bold uppercase tracking-wide text-muted-foreground">
@@ -127,19 +163,18 @@ function ElderScreen() {
           <Pill color={current.color} />
           <h1 className="text-elder-xl font-extrabold leading-tight">{current.name}</h1>
           <p className="text-elder-md">{current.dose}</p>
-          <p className="text-elder-sm text-muted-foreground">{current.note}</p>
-          <button
-            onClick={confirm}
-            className="mt-2 w-full rounded-3xl bg-success py-8 text-elder-xl font-extrabold text-success-foreground shadow-lg active:scale-95"
-          >
+          {current.note && <p className="text-elder-sm text-muted-foreground">{current.note}</p>}
+          <button onClick={confirm} className="mt-2 w-full rounded-3xl bg-success py-8 text-elder-xl font-extrabold text-success-foreground shadow-lg active:scale-95">
             I TOOK IT
           </button>
         </section>
-      ) : (
+      ) : meds.length ? (
         <section className="flex flex-col items-center gap-3 rounded-3xl border-4 border-success bg-success/15 p-8 text-center">
           <Check className="h-20 w-20 text-success" strokeWidth={4} />
           <h1 className="text-elder-lg font-extrabold">All done for today</h1>
         </section>
+      ) : (
+        <p className="rounded-3xl border-4 border-border p-8 text-center text-elder-md">No medicines yet. Your family will add them.</p>
       )}
 
       {lastDone && current && (
@@ -148,37 +183,42 @@ function ElderScreen() {
         </p>
       )}
 
-      {/* Daily check-in */}
       <button
-        disabled={checkedIn}
-        onClick={() => {
-          update({ ...state, lastCheckin: today });
-          speak("Thank you. Your family knows you are okay.");
-        }}
-        className={`flex items-center justify-center gap-3 rounded-3xl border-4 py-6 text-elder-lg font-bold ${checkedIn ? "border-success bg-success/15" : "border-primary bg-primary text-primary-foreground"}`}
+        disabled={today.checkedIn}
+        onClick={doCheckIn}
+        className={`flex items-center justify-center gap-3 rounded-3xl border-4 py-6 text-elder-lg font-bold ${today.checkedIn ? "border-success bg-success/15" : "border-primary bg-primary text-primary-foreground"}`}
       >
         <Heart className="h-10 w-10" strokeWidth={3} />
-        {checkedIn ? "You said you're okay today" : "I'm okay today"}
+        {today.checkedIn ? "You said you're okay today" : "I'm okay today"}
       </button>
 
-      <SosButton sent={sosSent} onSend={() => { setSosSent(true); speak("Help is on the way. Your family has been alerted."); }} onReset={() => setSosSent(false)} />
+      <SosButton
+        sent={sosSent}
+        onSend={() => {
+          setSosSent(true);
+          speak("Help is on the way. Your family has been alerted.");
+          if (token) void sendSos({ data: { deviceToken: token } });
+        }}
+        onReset={() => setSosSent(false)}
+      />
 
       <button onClick={() => setView("privacy")} className="flex items-center justify-center gap-3 rounded-2xl border-2 border-border py-4 text-elder-sm font-semibold">
-        <ShieldCheck className="h-8 w-8" /> What my family can see {state.paused && "· Paused"}
+        <ShieldCheck className="h-8 w-8" /> What my family can see {today.paused && "· Paused"}
       </button>
 
-      {/* Demo helpers for the college presentation */}
       <footer className="mt-4 flex flex-wrap gap-2 border-t border-border pt-4 text-sm text-muted-foreground">
-        <span className="w-full font-semibold">Demo controls</span>
+        <span className="w-full font-semibold">{token ? "Paired with family" : "Demo mode (sample medicines)"}</span>
         <button className="rounded-md border px-3 py-2" onClick={() => {
           if (!current) return;
           const real = new Date();
-          const target = toMin(current.time) - (real.getHours() * 60 + real.getMinutes());
           spokenRef.current = {};
-          update({ ...state, demoOffsetMin: target });
+          setOffset(toMin(current.time) - (real.getHours() * 60 + real.getMinutes()));
         }}>Jump to dose time</button>
-        <button className="rounded-md border px-3 py-2" onClick={() => update({ ...state, demoOffsetMin: state.demoOffsetMin + 10 })}>+10 min</button>
-        <button className="rounded-md border px-3 py-2" onClick={() => { spokenRef.current = {}; update(emptyState); }}>Reset day</button>
+        <button className="rounded-md border px-3 py-2" onClick={() => setOffset(offset + 10)}>+10 min</button>
+        {!token && <button className="rounded-md border px-3 py-2" onClick={() => { spokenRef.current = {}; saveDemo(emptyDemo); setOffset(0); void refresh(); }}>Reset day</button>}
+        {token
+          ? <button className="rounded-md border px-3 py-2" onClick={() => { setDeviceToken(null); void refresh(); }}>Unpair this phone</button>
+          : <Link to="/pair" className="rounded-md border px-3 py-2">Pair with family</Link>}
         <Link to="/" className="rounded-md border px-3 py-2">Home</Link>
       </footer>
     </main>
@@ -198,6 +238,11 @@ function Pill({ color }: { color: string }) {
 function SosButton({ sent, onSend, onReset }: { sent: boolean; onSend: () => void; onReset: () => void }) {
   const [progress, setProgress] = useState(0);
   const timer = useRef<number | null>(null);
+  const stop = () => {
+    if (timer.current) clearInterval(timer.current);
+    timer.current = null;
+    setProgress(0);
+  };
   const start = () => {
     const t0 = Date.now();
     timer.current = window.setInterval(() => {
@@ -205,11 +250,6 @@ function SosButton({ sent, onSend, onReset }: { sent: boolean; onSend: () => voi
       setProgress(p);
       if (p >= 1) { stop(); onSend(); }
     }, 50);
-  };
-  const stop = () => {
-    if (timer.current) clearInterval(timer.current);
-    timer.current = null;
-    setProgress(0);
   };
 
   if (sent) {
@@ -254,7 +294,7 @@ function PrivacyView({ paused, onToggle, onBack }: { paused: boolean; onToggle: 
       <button onClick={onToggle} className={`rounded-3xl border-4 py-6 text-elder-md font-bold ${paused ? "border-success bg-success text-success-foreground" : "border-foreground bg-card"}`}>
         {paused ? "Sharing is paused — tap to resume" : "Pause sharing"}
       </button>
-      {paused && <p className="text-elder-xs text-muted-foreground">Your family will see "Paused by choice". No alarm is sent.</p>}
+      {paused && <p className="text-elder-xs text-muted-foreground">Your family will see "Paused by choice". No alarm is sent. SOS still works.</p>}
       <button onClick={onBack} className="rounded-3xl bg-primary py-6 text-elder-md font-bold text-primary-foreground">Back</button>
     </main>
   );
