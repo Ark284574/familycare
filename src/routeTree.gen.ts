@@ -10,12 +10,25 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
+import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ElderRouteImport } from './routes/elder'
 import { Route as PairRouteImport } from './routes/pair'
+import { Route as AuthenticatedFamilyRouteImport } from './routes/_authenticated/family'
+import { Route as AuthenticatedElderSetupIdRouteImport } from './routes/_authenticated/elder-setup.$id'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
+  id: '/_authenticated',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AuthRoute = AuthRouteImport.update({
+  id: '/auth',
+  path: '/auth',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ElderRoute = ElderRouteImport.update({
@@ -28,33 +41,64 @@ const PairRoute = PairRouteImport.update({
   path: '/pair',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthenticatedFamilyRoute = AuthenticatedFamilyRouteImport.update({
+  id: '/family',
+  path: '/family',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedElderSetupIdRoute =
+  AuthenticatedElderSetupIdRouteImport.update({
+    id: '/elder-setup/$id',
+    path: '/elder-setup/$id',
+    getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/elder': typeof ElderRoute
   '/pair': typeof PairRoute
+  '/family': typeof AuthenticatedFamilyRoute
+  '/elder-setup/$id': typeof AuthenticatedElderSetupIdRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/auth': typeof AuthRoute
   '/elder': typeof ElderRoute
   '/pair': typeof PairRoute
+  '/family': typeof AuthenticatedFamilyRoute
+  '/elder-setup/$id': typeof AuthenticatedElderSetupIdRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/auth': typeof AuthRoute
   '/elder': typeof ElderRoute
   '/pair': typeof PairRoute
+  '/_authenticated/family': typeof AuthenticatedFamilyRoute
+  '/_authenticated/elder-setup/$id': typeof AuthenticatedElderSetupIdRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/elder' | '/pair'
+  fullPaths: '/' | '/auth' | '/elder' | '/pair' | '/family' | '/elder-setup/$id'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/elder' | '/pair'
-  id: '__root__' | '/' | '/elder' | '/pair'
+  to: '/' | '/auth' | '/elder' | '/pair' | '/family' | '/elder-setup/$id'
+  id:
+    | '__root__'
+    | '/'
+    | '/_authenticated'
+    | '/auth'
+    | '/elder'
+    | '/pair'
+    | '/_authenticated/family'
+    | '/_authenticated/elder-setup/$id'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AuthRoute: typeof AuthRoute
   ElderRoute: typeof ElderRoute
   PairRoute: typeof PairRoute
 }
@@ -66,6 +110,20 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/_authenticated': {
+      id: '/_authenticated'
+      path: ''
+      fullPath: '/'
+      preLoaderRoute: typeof AuthenticatedRouteRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/auth': {
+      id: '/auth'
+      path: '/auth'
+      fullPath: '/auth'
+      preLoaderRoute: typeof AuthRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/elder': {
@@ -82,11 +140,40 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PairRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/_authenticated/family': {
+      id: '/_authenticated/family'
+      path: '/family'
+      fullPath: '/family'
+      preLoaderRoute: typeof AuthenticatedFamilyRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/elder-setup/$id': {
+      id: '/_authenticated/elder-setup/$id'
+      path: '/elder-setup/$id'
+      fullPath: '/elder-setup/$id'
+      preLoaderRoute: typeof AuthenticatedElderSetupIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
   }
 }
 
+interface AuthenticatedRouteRouteChildren {
+  AuthenticatedFamilyRoute: typeof AuthenticatedFamilyRoute
+  AuthenticatedElderSetupIdRoute: typeof AuthenticatedElderSetupIdRoute
+}
+
+const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
+  AuthenticatedFamilyRoute: AuthenticatedFamilyRoute,
+  AuthenticatedElderSetupIdRoute: AuthenticatedElderSetupIdRoute,
+}
+
+const AuthenticatedRouteRouteWithChildren =
+  AuthenticatedRouteRoute._addFileChildren(AuthenticatedRouteRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AuthRoute: AuthRoute,
   ElderRoute: ElderRoute,
   PairRoute: PairRoute,
 }
