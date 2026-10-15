@@ -5,8 +5,8 @@ export const GRACE_MIN = 30; // after this, an unconfirmed dose turns red
 
 export type Status = "green" | "yellow" | "red" | "paused";
 
-export function todayStatus(
-  meds: { id: string; time: string }[],
+export function todayStatus<M extends { id: string; time: string }>(
+  meds: M[],
   confirmedIds: Set<string>,
   now: Date,
   paused: boolean,
