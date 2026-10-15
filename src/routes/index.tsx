@@ -24,13 +24,13 @@ function Index() {
       <Link to="/elder" className="rounded-3xl bg-success p-8 text-center text-elder-lg font-extrabold text-success-foreground shadow-lg">
         I am the Elder
       </Link>
-      <div className="flex items-center gap-4 rounded-3xl border-4 border-dashed border-border p-6 text-muted-foreground">
-        <Users className="h-10 w-10" />
+      <Link to="/family" className="flex items-center gap-4 rounded-3xl border-4 border-primary bg-card p-6">
+        <Users className="h-10 w-10 text-primary" />
         <div>
           <p className="text-elder-sm font-bold">I am Family</p>
-          <p className="text-base">Coming in the next step: sign in, pairing and live dashboard.</p>
+          <p className="text-base text-muted-foreground">Sign in, add medicines, pair the phone, see today's status.</p>
         </div>
-      </div>
+      </Link>
     </main>
   );
 }

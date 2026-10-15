@@ -61,6 +61,7 @@
   --color-sidebar-ring: var(--sidebar-ring);
   --color-success: var(--success);
   --color-success-foreground: var(--success-foreground);
+  --color-warning: var(--warning);
   --font-sans: "Atkinson Hyperlegible", system-ui, sans-serif;
   --text-elder-xs: 1.25rem;
   --text-elder-sm: 1.5rem;
@@ -89,6 +90,7 @@
   --destructive-foreground: oklch(0.99 0 0);
   --success: oklch(0.5 0.14 150);
   --success-foreground: oklch(0.99 0 0);
+  --warning: oklch(0.78 0.15 75);
   --pill-white: oklch(0.95 0.005 85);
   --pill-pink: oklch(0.8 0.1 0);
   --pill-yellow: oklch(0.88 0.15 90);
