@@ -138,21 +138,30 @@ export type Database = {
       }
       sos_events: {
         Row: {
+          accuracy_m: number | null
           created_at: string
           elder_id: string
           id: string
+          latitude: number | null
+          longitude: number | null
           resolved: boolean
         }
         Insert: {
+          accuracy_m?: number | null
           created_at?: string
           elder_id: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           resolved?: boolean
         }
         Update: {
+          accuracy_m?: number | null
           created_at?: string
           elder_id?: string
           id?: string
+          latitude?: number | null
+          longitude?: number | null
           resolved?: boolean
         }
         Relationships: [

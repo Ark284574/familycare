@@ -42,6 +42,7 @@ function ElderScreen() {
   const [offset, setOffset] = useState(0); // demo only: shifts the clock forward (minutes)
   const [view, setView] = useState<"home" | "privacy">("home");
   const [sosSent, setSosSent] = useState(false);
+  const [sosLocated, setSosLocated] = useState(false);
   const spokenRef = useRef<Record<string, number>>({});
 
   const clock = new Date(now.getTime() + offset * 60000);
@@ -194,12 +195,28 @@ function ElderScreen() {
 
       <SosButton
         sent={sosSent}
+        located={sosLocated}
         onSend={() => {
           setSosSent(true);
+          setSosLocated(false);
           speak("Help is on the way. Your family has been alerted.");
-          if (token) void sendSos({ data: { deviceToken: token } });
+          // Ask for location once, only now. Never wait more than 8 s; send anyway.
+          let done = false;
+          const send = (c?: GeolocationCoordinates) => {
+            if (done) return;
+            done = true;
+            if (c) setSosLocated(true);
+            if (token) void sendSos({ data: { deviceToken: token, ...(c ? { latitude: c.latitude, longitude: c.longitude, accuracy: c.accuracy } : {}) } });
+          };
+          const fallback = window.setTimeout(() => send(), 8500);
+          if (!navigator.geolocation) { clearTimeout(fallback); send(); return; }
+          navigator.geolocation.getCurrentPosition(
+            (p) => { clearTimeout(fallback); send(p.coords); },
+            () => { clearTimeout(fallback); send(); },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+          );
         }}
-        onReset={() => setSosSent(false)}
+        onReset={() => { setSosSent(false); setSosLocated(false); }}
       />
 
       <button onClick={() => setView("privacy")} className="flex items-center justify-center gap-3 rounded-2xl border-2 border-border py-4 text-elder-sm font-semibold">
@@ -235,7 +252,7 @@ function Pill({ color }: { color: string }) {
 }
 
 // SOS needs a 3-second hold so it is not pressed by accident.
-function SosButton({ sent, onSend, onReset }: { sent: boolean; onSend: () => void; onReset: () => void }) {
+function SosButton({ sent, located, onSend, onReset }: { sent: boolean; located: boolean; onSend: () => void; onReset: () => void }) {
   const [progress, setProgress] = useState(0);
   const timer = useRef<number | null>(null);
   const stop = () => {
@@ -255,7 +272,7 @@ function SosButton({ sent, onSend, onReset }: { sent: boolean; onSend: () => voi
   if (sent) {
     return (
       <div className="rounded-3xl border-4 border-destructive bg-destructive/10 p-6 text-center">
-        <p className="text-elder-lg font-extrabold text-destructive">Family alerted</p>
+        <p className="text-elder-lg font-extrabold text-destructive">{located ? "Family alerted — location shared" : "Family alerted"}</p>
         <p className="text-elder-sm">Help is on the way.</p>
         <button onClick={onReset} className="mt-3 rounded-xl border-2 px-5 py-3 text-elder-sm font-semibold">I'm fine now</button>
       </div>
@@ -284,10 +301,11 @@ function PrivacyView({ paused, onToggle, onBack }: { paused: boolean; onToggle: 
         <li>✓ The last time you used this app</li>
         <li>✓ When you tap <b>I'm okay today</b></li>
         <li>✓ When you press <b>SOS</b></li>
+        <li>✓ Where you are, only when you press <b>SOS</b></li>
       </ul>
       <h2 className="text-elder-md font-bold">What they can NOT see</h2>
       <ul className="space-y-3 text-elder-sm">
-        <li>✗ Where you are</li>
+        <li>✗ Where you are at any other time</li>
         <li>✗ Your camera or microphone</li>
         <li>✗ Your messages, calls or photos</li>
       </ul>

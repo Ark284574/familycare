@@ -32,7 +32,7 @@ function Dashboard() {
   const [elders, setElders] = useState<Elder[]>([]);
   const [meds, setMeds] = useState<Med[]>([]);
   const [events, setEvents] = useState<{ medicine_id: string }[]>([]);
-  const [sos, setSos] = useState<{ id: string; elder_id: string; created_at: string }[]>([]);
+  const [sos, setSos] = useState<{ id: string; elder_id: string; created_at: string; latitude: number | null; longitude: number | null; accuracy_m: number | null }[]>([]);
   const [newName, setNewName] = useState("");
   const [now, setNow] = useState(new Date());
 
@@ -42,12 +42,12 @@ function Dashboard() {
       supabase.from("elders").select("id, name, sharing_paused, last_active_at, last_checkin_date, paired_at").order("created_at"),
       supabase.from("medicines").select("id, elder_id, name, time, pills_remaining"),
       supabase.from("dose_events").select("medicine_id").eq("day", day),
-      supabase.from("sos_events").select("id, elder_id, created_at").eq("resolved", false),
+      supabase.from("sos_events").select("id, elder_id, created_at, latitude, longitude, accuracy_m").eq("resolved", false),
     ]);
     setElders(e.data ?? []);
     setMeds(m.data ?? []);
     setEvents(d.data ?? []);
-    setSos(s.data ?? []);
+    setSos((s.data ?? []) as never);
     setNow(new Date());
   }, []);
 
@@ -103,8 +103,16 @@ function Dashboard() {
             </div>
 
             {openSos.map((s) => (
-              <div key={s.id} className="mt-3 flex items-center justify-between rounded-xl bg-destructive p-3 font-bold text-destructive-foreground">
-                SOS pressed at {new Date(s.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+              <div key={s.id} className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-destructive p-3 font-bold text-destructive-foreground">
+                <div>
+                  <p>SOS pressed at {new Date(s.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</p>
+                  {s.latitude != null && s.longitude != null ? (
+                    <>
+                      {s.accuracy_m != null && <p className="text-sm font-normal">Accurate to about {Math.round(s.accuracy_m)} metres</p>}
+                      <a href={`https://www.google.com/maps?q=${s.latitude},${s.longitude}`} target="_blank" rel="noreferrer" className="mt-2 inline-block rounded-md bg-card px-4 py-2 text-foreground underline">Open in Google Maps</a>
+                    </>
+                  ) : <p className="text-sm font-normal">Location not available</p>}
+                </div>
                 <button className="rounded-md bg-card px-3 py-1 text-sm text-foreground" onClick={async () => { await supabase.from("sos_events").update({ resolved: true }).eq("id", s.id); void load(); }}>
                   I've handled it
                 </button>

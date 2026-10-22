@@ -88,11 +88,23 @@ export const checkIn = createServerFn({ method: "POST" })
     return { ok: true };
   });
 
+// SOS. Location is optional: it is read ONLY at the moment SOS is sent.
 export const sendSos = createServerFn({ method: "POST" })
-  .inputValidator((d) => z.object({ deviceToken: token }).parse(d))
+  .inputValidator((d) =>
+    z.object({
+      deviceToken: token,
+      latitude: z.number().min(-90).max(90).optional(),
+      longitude: z.number().min(-180).max(180).optional(),
+      accuracy: z.number().min(0).max(100000).optional(),
+    }).parse(d),
+  )
   .handler(async ({ data }) => {
     const { db, elder } = await elderFor(data.deviceToken);
-    await db.from("sos_events").insert({ elder_id: elder.id });
+    const hasLoc = data.latitude !== undefined && data.longitude !== undefined;
+    await db.from("sos_events").insert({
+      elder_id: elder.id,
+      ...(hasLoc ? { latitude: data.latitude, longitude: data.longitude, accuracy_m: data.accuracy ?? null } : {}),
+    } as never);
     return { ok: true };
   });
 

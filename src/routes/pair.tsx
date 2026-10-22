@@ -6,7 +6,8 @@ import { setDeviceToken } from "@/lib/elder-store";
 
 // Family shows a 6-digit code (or a QR that opens /pair?code=123456).
 export const Route = createFileRoute("/pair")({
-  validateSearch: z.object({ code: z.string().optional() }),
+  // The URL may turn "424243" into a number, so accept both and keep it as text.
+  validateSearch: z.object({ code: z.union([z.string(), z.number()]).transform((v) => String(v).padStart(6, "0")).optional() }),
   head: () => ({
     meta: [
       { title: "Pair this phone — FamilyCare" },
