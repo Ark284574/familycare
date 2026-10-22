@@ -252,7 +252,7 @@ function Pill({ color }: { color: string }) {
 }
 
 // SOS needs a 3-second hold so it is not pressed by accident.
-function SosButton({ sent, onSend, onReset }: { sent: boolean; onSend: () => void; onReset: () => void }) {
+function SosButton({ sent, located, onSend, onReset }: { sent: boolean; located: boolean; onSend: () => void; onReset: () => void }) {
   const [progress, setProgress] = useState(0);
   const timer = useRef<number | null>(null);
   const stop = () => {
@@ -272,7 +272,7 @@ function SosButton({ sent, onSend, onReset }: { sent: boolean; onSend: () => voi
   if (sent) {
     return (
       <div className="rounded-3xl border-4 border-destructive bg-destructive/10 p-6 text-center">
-        <p className="text-elder-lg font-extrabold text-destructive">Family alerted</p>
+        <p className="text-elder-lg font-extrabold text-destructive">{located ? "Family alerted — location shared" : "Family alerted"}</p>
         <p className="text-elder-sm">Help is on the way.</p>
         <button onClick={onReset} className="mt-3 rounded-xl border-2 px-5 py-3 text-elder-sm font-semibold">I'm fine now</button>
       </div>
@@ -301,10 +301,11 @@ function PrivacyView({ paused, onToggle, onBack }: { paused: boolean; onToggle: 
         <li>✓ The last time you used this app</li>
         <li>✓ When you tap <b>I'm okay today</b></li>
         <li>✓ When you press <b>SOS</b></li>
+        <li>✓ Where you are, only when you press <b>SOS</b></li>
       </ul>
       <h2 className="text-elder-md font-bold">What they can NOT see</h2>
       <ul className="space-y-3 text-elder-sm">
-        <li>✗ Where you are</li>
+        <li>✗ Where you are at any other time</li>
         <li>✗ Your camera or microphone</li>
         <li>✗ Your messages, calls or photos</li>
       </ul>
