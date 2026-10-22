@@ -42,6 +42,7 @@ function ElderScreen() {
   const [offset, setOffset] = useState(0); // demo only: shifts the clock forward (minutes)
   const [view, setView] = useState<"home" | "privacy">("home");
   const [sosSent, setSosSent] = useState(false);
+  const [sosLocated, setSosLocated] = useState(false);
   const spokenRef = useRef<Record<string, number>>({});
 
   const clock = new Date(now.getTime() + offset * 60000);
@@ -194,12 +195,28 @@ function ElderScreen() {
 
       <SosButton
         sent={sosSent}
+        located={sosLocated}
         onSend={() => {
           setSosSent(true);
+          setSosLocated(false);
           speak("Help is on the way. Your family has been alerted.");
-          if (token) void sendSos({ data: { deviceToken: token } });
+          // Ask for location once, only now. Never wait more than 8 s; send anyway.
+          let done = false;
+          const send = (c?: GeolocationCoordinates) => {
+            if (done) return;
+            done = true;
+            if (c) setSosLocated(true);
+            if (token) void sendSos({ data: { deviceToken: token, ...(c ? { latitude: c.latitude, longitude: c.longitude, accuracy: c.accuracy } : {}) } });
+          };
+          const fallback = window.setTimeout(() => send(), 8500);
+          if (!navigator.geolocation) { clearTimeout(fallback); send(); return; }
+          navigator.geolocation.getCurrentPosition(
+            (p) => { clearTimeout(fallback); send(p.coords); },
+            () => { clearTimeout(fallback); send(); },
+            { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
+          );
         }}
-        onReset={() => setSosSent(false)}
+        onReset={() => { setSosSent(false); setSosLocated(false); }}
       />
 
       <button onClick={() => setView("privacy")} className="flex items-center justify-center gap-3 rounded-2xl border-2 border-border py-4 text-elder-sm font-semibold">
