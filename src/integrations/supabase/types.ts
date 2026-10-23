@@ -14,6 +14,21 @@ export type Database = {
   }
   public: {
     Tables: {
+      alerts_sent: {
+        Row: {
+          created_at: string
+          key: string
+        }
+        Insert: {
+          created_at?: string
+          key: string
+        }
+        Update: {
+          created_at?: string
+          key?: string
+        }
+        Relationships: []
+      }
       dose_events: {
         Row: {
           confirmed_at: string
@@ -135,6 +150,75 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      notification_settings: {
+        Row: {
+          checkin_alerts: boolean
+          checkin_by: string
+          dose_alerts: boolean
+          quiet_enabled: boolean
+          quiet_end: string
+          quiet_start: string
+          sos_alerts: boolean
+          sos_ignores_quiet: boolean
+          timezone: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          checkin_alerts?: boolean
+          checkin_by?: string
+          dose_alerts?: boolean
+          quiet_enabled?: boolean
+          quiet_end?: string
+          quiet_start?: string
+          sos_alerts?: boolean
+          sos_ignores_quiet?: boolean
+          timezone?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          checkin_alerts?: boolean
+          checkin_by?: string
+          dose_alerts?: boolean
+          quiet_enabled?: boolean
+          quiet_end?: string
+          quiet_start?: string
+          sos_alerts?: boolean
+          sos_ignores_quiet?: boolean
+          timezone?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      push_subscriptions: {
+        Row: {
+          auth: string
+          created_at: string
+          endpoint: string
+          id: string
+          p256dh: string
+          user_id: string
+        }
+        Insert: {
+          auth: string
+          created_at?: string
+          endpoint: string
+          id?: string
+          p256dh: string
+          user_id: string
+        }
+        Update: {
+          auth?: string
+          created_at?: string
+          endpoint?: string
+          id?: string
+          p256dh?: string
+          user_id?: string
+        }
+        Relationships: []
       }
       sos_events: {
         Row: {
