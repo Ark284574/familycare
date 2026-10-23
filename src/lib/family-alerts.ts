@@ -34,6 +34,17 @@ export async function showSosNotification(name: string, sosId: string, hasLocati
   }
 }
 
+// Gentle alert (no siren): a dose is still "not confirmed" after the grace period.
+export async function showDoseNotification(name: string, medName: string, time: string) {
+  if (!notificationsSupported() || Notification.permission !== "granted") return;
+  const title = `${name}: ${medName} not confirmed`;
+  const body = `The ${time} dose has not been confirmed yet. Maybe give them a call.`;
+  const tag = `dose-${name}-${medName}-${time}`;
+  const reg = await registration();
+  if (reg) await reg.showNotification(title, { body, tag, data: { url: "/family" } });
+  else new Notification(title, { body, tag });
+}
+
 export function playSiren() {
   try {
     const ctx = new AudioContext();
