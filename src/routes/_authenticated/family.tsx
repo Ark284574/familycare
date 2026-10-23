@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { enableNotifications, notificationsSupported, playSiren, showSosNotification } from "@/lib/family-alerts";
+import { enableNotifications, notificationsSupported, playSiren, showDoseNotification, showSosNotification } from "@/lib/family-alerts";
 import { supabase } from "@/integrations/supabase/client";
 import { dayKey } from "@/lib/elder-store";
 import { todayStatus, type Status } from "@/lib/status";
@@ -100,6 +100,22 @@ function Dashboard() {
 
   const confirmedIds = new Set(events.map((e) => e.medicine_id));
   const today = dayKey(now);
+
+  // Alert once per dose when it passes the grace period still "not confirmed".
+  const alertedDoses = useRef<Set<string>>(new Set());
+  useEffect(() => {
+    for (const el of elders) {
+      if (el.sharing_paused || !el.paired_at) continue;
+      const list = meds.filter((m) => m.elder_id === el.id);
+      const st = todayStatus(list, new Set(events.map((e) => e.medicine_id)), now, false, false);
+      for (const m of st.notConfirmed) {
+        const key = `${today}_${m.id}`;
+        if (alertedDoses.current.has(key)) continue;
+        alertedDoses.current.add(key);
+        void showDoseNotification(el.name, m.name, m.time);
+      }
+    }
+  }, [elders, meds, events, now, today]);
 
   return (
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-5 bg-background p-5 text-foreground">
