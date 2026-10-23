@@ -15,6 +15,13 @@
       "when": 1792642233073,
       "tag": "0001_sos_location",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1792777597013,
+      "tag": "0002_push_and_settings",
+      "breakpoints": true
     }
   ]
 }
