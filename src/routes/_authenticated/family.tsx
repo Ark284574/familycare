@@ -135,7 +135,7 @@ function Dashboard() {
             </div>
 
             {openSos.map((s) => (
-              <div key={s.id} className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-destructive p-3 font-bold text-destructive-foreground">
+              <div key={s.id} id={`sos-${s.id}`} className="mt-3 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-destructive p-3 font-bold text-destructive-foreground">
                 <div>
                   <p>SOS pressed at {new Date(s.created_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}</p>
                   {s.latitude != null && s.longitude != null ? (
