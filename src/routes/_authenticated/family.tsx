@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { enableNotifications, notificationsSupported, playSiren, showSosNotification } from "@/lib/family-alerts";
 import { supabase } from "@/integrations/supabase/client";
 import { dayKey } from "@/lib/elder-store";
 import { todayStatus, type Status } from "@/lib/status";
@@ -36,6 +37,13 @@ function Dashboard() {
   const [newName, setNewName] = useState("");
   const [now, setNow] = useState(new Date());
 
+  const [perm, setPerm] = useState<NotificationPermission | "unsupported">("default");
+  const seenSos = useRef<Set<string> | null>(null);
+
+  useEffect(() => {
+    setPerm(notificationsSupported() ? Notification.permission : "unsupported");
+  }, []);
+
   const load = useCallback(async () => {
     const day = dayKey(new Date());
     const [e, m, d, s] = await Promise.all([
@@ -44,10 +52,23 @@ function Dashboard() {
       supabase.from("dose_events").select("medicine_id").eq("day", day),
       supabase.from("sos_events").select("id, elder_id, created_at, latitude, longitude, accuracy_m").eq("resolved", false),
     ]);
-    setElders(e.data ?? []);
+    const elderList = e.data ?? [];
+    const sosList = (s.data ?? []) as { id: string; elder_id: string; created_at: string; latitude: number | null; longitude: number | null; accuracy_m: number | null }[];
+    // Alert on any SOS we haven't seen since the page opened.
+    if (seenSos.current) {
+      for (const x of sosList) {
+        if (!seenSos.current.has(x.id)) {
+          const name = elderList.find((el) => el.id === x.elder_id)?.name ?? "Your parent";
+          playSiren();
+          void showSosNotification(name, x.id, x.latitude != null);
+        }
+      }
+    }
+    seenSos.current = new Set(sosList.map((x) => x.id));
+    setElders(elderList);
     setMeds(m.data ?? []);
     setEvents(d.data ?? []);
-    setSos((s.data ?? []) as never);
+    setSos(sosList);
     setNow(new Date());
   }, []);
 
@@ -86,6 +107,17 @@ function Dashboard() {
         <h1 className="text-3xl font-bold">FamilyCare</h1>
         <button onClick={signOut} className="rounded-md border px-3 py-2 text-sm">Sign out</button>
       </header>
+
+      {perm === "default" && (
+        <button onClick={async () => setPerm(await enableNotifications())} className="rounded-2xl border-4 border-destructive bg-destructive/10 p-4 text-left text-lg font-bold">
+          Turn on SOS alerts on this phone
+          <span className="block text-sm font-normal">Get a notification the moment your parent presses SOS.</span>
+        </button>
+      )}
+      {perm === "denied" && <p className="rounded-xl bg-muted p-3 text-sm">SOS notifications are blocked. Allow notifications for this site in your browser settings.</p>}
+      {perm === "granted" && <p className="text-sm text-muted-foreground">✓ SOS alerts are on for this phone</p>}
+
+
 
       {elders.map((el) => {
         const list = meds.filter((m) => m.elder_id === el.id);
