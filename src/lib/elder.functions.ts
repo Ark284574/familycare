@@ -105,7 +105,7 @@ export const sendSos = createServerFn({ method: "POST" })
     await db.from("sos_events").insert({
       elder_id: elder.id,
       ...(hasLoc ? { latitude: data.latitude, longitude: data.longitude, accuracy_m: data.accuracy ?? null } : {}),
-    } as never).select("id").single().then((r) => r);
+    } as never);
     // Push alert to the family's phones (works even when their app is closed).
     try {
       const { sendToFamily } = await import("./push.server");
