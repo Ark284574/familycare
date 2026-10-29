@@ -121,7 +121,10 @@ function Dashboard() {
     <main className="mx-auto flex min-h-screen max-w-2xl flex-col gap-5 bg-background p-5 text-foreground">
       <header className="flex items-center justify-between">
         <h1 className="text-3xl font-bold">FamilyCare</h1>
-        <button onClick={signOut} className="rounded-md border px-3 py-2 text-sm">Sign out</button>
+        <div className="flex gap-2">
+          <Link to="/settings" className="rounded-md border px-3 py-2 text-sm">Alert settings</Link>
+          <button onClick={signOut} className="rounded-md border px-3 py-2 text-sm">Sign out</button>
+        </div>
       </header>
 
       {perm === "default" && (
@@ -147,7 +150,10 @@ function Dashboard() {
                 <h2 className="text-2xl font-bold">{el.name}</h2>
                 <p className="text-lg font-semibold">{STATUS_LABEL[st.status]}</p>
               </div>
-              <Link to="/elder-setup/$id" params={{ id: el.id }} className="rounded-md border bg-card px-3 py-2 text-sm">Medicines & pairing</Link>
+              <div className="flex flex-col gap-2">
+                <Link to="/elder-setup/$id" params={{ id: el.id }} className="rounded-md border bg-card px-3 py-2 text-sm">Medicines & pairing</Link>
+                <Link to="/ask/$id" params={{ id: el.id }} className="rounded-md border bg-card px-3 py-2 text-sm">Ask a question</Link>
+              </div>
             </div>
 
             {openSos.map((s) => (

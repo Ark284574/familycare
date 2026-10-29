@@ -29,6 +29,35 @@ export type Database = {
         }
         Relationships: []
       }
+      checkins: {
+        Row: {
+          created_at: string
+          day: string
+          elder_id: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          day: string
+          elder_id: string
+          id?: string
+        }
+        Update: {
+          created_at?: string
+          day?: string
+          elder_id?: string
+          id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "checkins_elder_id_fkey"
+            columns: ["elder_id"]
+            isOneToOne: false
+            referencedRelation: "elders"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       dose_events: {
         Row: {
           confirmed_at: string

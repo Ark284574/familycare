@@ -15,7 +15,10 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ElderRouteImport } from './routes/elder'
 import { Route as PairRouteImport } from './routes/pair'
 import { Route as AuthenticatedFamilyRouteImport } from './routes/_authenticated/family'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedAskIdRouteImport } from './routes/_authenticated/ask.$id'
 import { Route as AuthenticatedElderSetupIdRouteImport } from './routes/_authenticated/elder-setup.$id'
+import { Route as ApiPublicJobsCheckAlertsRouteImport } from './routes/api/public/jobs/check-alerts'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -46,11 +49,27 @@ const AuthenticatedFamilyRoute = AuthenticatedFamilyRouteImport.update({
   path: '/family',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAskIdRoute = AuthenticatedAskIdRouteImport.update({
+  id: '/ask/$id',
+  path: '/ask/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedElderSetupIdRoute =
   AuthenticatedElderSetupIdRouteImport.update({
     id: '/elder-setup/$id',
     path: '/elder-setup/$id',
     getParentRoute: () => AuthenticatedRouteRoute,
+  } as any)
+const ApiPublicJobsCheckAlertsRoute =
+  ApiPublicJobsCheckAlertsRouteImport.update({
+    id: '/api/public/jobs/check-alerts',
+    path: '/api/public/jobs/check-alerts',
+    getParentRoute: () => rootRouteImport,
   } as any)
 
 export interface FileRoutesByFullPath {
@@ -59,7 +78,10 @@ export interface FileRoutesByFullPath {
   '/elder': typeof ElderRoute
   '/pair': typeof PairRoute
   '/family': typeof AuthenticatedFamilyRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/ask/$id': typeof AuthenticatedAskIdRoute
   '/elder-setup/$id': typeof AuthenticatedElderSetupIdRoute
+  '/api/public/jobs/check-alerts': typeof ApiPublicJobsCheckAlertsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -67,7 +89,10 @@ export interface FileRoutesByTo {
   '/elder': typeof ElderRoute
   '/pair': typeof PairRoute
   '/family': typeof AuthenticatedFamilyRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/ask/$id': typeof AuthenticatedAskIdRoute
   '/elder-setup/$id': typeof AuthenticatedElderSetupIdRoute
+  '/api/public/jobs/check-alerts': typeof ApiPublicJobsCheckAlertsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -77,13 +102,34 @@ export interface FileRoutesById {
   '/elder': typeof ElderRoute
   '/pair': typeof PairRoute
   '/_authenticated/family': typeof AuthenticatedFamilyRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/elder-setup/$id': typeof AuthenticatedElderSetupIdRoute
+  '/api/public/jobs/check-alerts': typeof ApiPublicJobsCheckAlertsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/auth' | '/elder' | '/pair' | '/family' | '/elder-setup/$id'
+  fullPaths:
+    | '/'
+    | '/auth'
+    | '/elder'
+    | '/pair'
+    | '/family'
+    | '/settings'
+    | '/ask/$id'
+    | '/elder-setup/$id'
+    | '/api/public/jobs/check-alerts'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/auth' | '/elder' | '/pair' | '/family' | '/elder-setup/$id'
+  to:
+    | '/'
+    | '/auth'
+    | '/elder'
+    | '/pair'
+    | '/family'
+    | '/settings'
+    | '/ask/$id'
+    | '/elder-setup/$id'
+    | '/api/public/jobs/check-alerts'
   id:
     | '__root__'
     | '/'
@@ -92,7 +138,10 @@ export interface FileRouteTypes {
     | '/elder'
     | '/pair'
     | '/_authenticated/family'
+    | '/_authenticated/settings'
+    | '/_authenticated/ask/$id'
     | '/_authenticated/elder-setup/$id'
+    | '/api/public/jobs/check-alerts'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -101,6 +150,7 @@ export interface RootRouteChildren {
   AuthRoute: typeof AuthRoute
   ElderRoute: typeof ElderRoute
   PairRoute: typeof PairRoute
+  ApiPublicJobsCheckAlertsRoute: typeof ApiPublicJobsCheckAlertsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -147,6 +197,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFamilyRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ask/$id': {
+      id: '/_authenticated/ask/$id'
+      path: '/ask/$id'
+      fullPath: '/ask/$id'
+      preLoaderRoute: typeof AuthenticatedAskIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/elder-setup/$id': {
       id: '/_authenticated/elder-setup/$id'
       path: '/elder-setup/$id'
@@ -154,16 +218,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedElderSetupIdRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/api/public/jobs/check-alerts': {
+      id: '/api/public/jobs/check-alerts'
+      path: '/api/public/jobs/check-alerts'
+      fullPath: '/api/public/jobs/check-alerts'
+      preLoaderRoute: typeof ApiPublicJobsCheckAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedFamilyRoute: typeof AuthenticatedFamilyRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedAskIdRoute: typeof AuthenticatedAskIdRoute
   AuthenticatedElderSetupIdRoute: typeof AuthenticatedElderSetupIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFamilyRoute: AuthenticatedFamilyRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedAskIdRoute: AuthenticatedAskIdRoute,
   AuthenticatedElderSetupIdRoute: AuthenticatedElderSetupIdRoute,
 }
 
@@ -176,6 +251,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthRoute: AuthRoute,
   ElderRoute: ElderRoute,
   PairRoute: PairRoute,
+  ApiPublicJobsCheckAlertsRoute: ApiPublicJobsCheckAlertsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

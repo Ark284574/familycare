@@ -1,22 +1,49 @@
-// Family-side alerts: phone notifications + a loud siren when a parent presses SOS.
+// Family-side alerts: push subscription, in-page notifications and a siren.
+import { savePushSubscription } from "./family.functions";
+
+// Public half of the push key pair (safe to ship to browsers).
+export const VAPID_PUBLIC_KEY = "BBJxdwt-2pPkv_C9QY-XHFQ8MJlct7g5Swc32BZeCCHI6LM0BnRbljeQ1nFMuiLYhCiMUbouV5jRl_Y1IClEjWA";
 
 export function notificationsSupported() {
   return typeof window !== "undefined" && "Notification" in window;
 }
 
+export function pushSupported() {
+  return typeof window !== "undefined" && "serviceWorker" in navigator && "PushManager" in window;
+}
+
 async function registration() {
   if (!("serviceWorker" in navigator)) return null;
   try {
-    return await navigator.serviceWorker.register("/notify-sw.js");
+    await navigator.serviceWorker.register("/notify-sw.js");
+    return await navigator.serviceWorker.ready;
   } catch {
     return null;
   }
 }
 
+function b64ToBytes(b64: string) {
+  const s = atob((b64 + "=".repeat((4 - (b64.length % 4)) % 4)).replace(/-/g, "+").replace(/_/g, "/"));
+  return Uint8Array.from(s, (c) => c.charCodeAt(0));
+}
+
+/** Subscribe this phone to push and save it for the signed-in family member. */
+export async function subscribePush() {
+  if (!pushSupported() || Notification.permission !== "granted") return false;
+  const reg = await registration();
+  if (!reg) return false;
+  let sub = await reg.pushManager.getSubscription();
+  if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC_KEY) });
+  const j = sub.toJSON();
+  if (!j.endpoint || !j.keys?.p256dh || !j.keys?.auth) return false;
+  await savePushSubscription({ data: { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth } });
+  return true;
+}
+
 export async function enableNotifications(): Promise<NotificationPermission> {
   if (!notificationsSupported()) return "denied";
   const p = await Notification.requestPermission();
-  if (p === "granted") await registration();
+  if (p === "granted") await subscribePush().catch(() => false);
   return p;
 }
 
@@ -32,17 +59,6 @@ export async function showSosNotification(name: string, sosId: string, hasLocati
     const n = new Notification(title, { body, tag: `sos-${sosId}`, requireInteraction: true });
     n.onclick = () => { window.focus(); window.location.hash = `sos-${sosId}`; n.close(); };
   }
-}
-
-// Gentle alert (no siren): a dose is still "not confirmed" after the grace period.
-export async function showDoseNotification(name: string, medName: string, time: string) {
-  if (!notificationsSupported() || Notification.permission !== "granted") return;
-  const title = `${name}: ${medName} not confirmed`;
-  const body = `The ${time} dose has not been confirmed yet. Maybe give them a call.`;
-  const tag = `dose-${name}-${medName}-${time}`;
-  const reg = await registration();
-  if (reg) await reg.showNotification(title, { body, tag, data: { url: "/family" } });
-  else new Notification(title, { body, tag });
 }
 
 export function playSiren() {

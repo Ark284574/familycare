@@ -18,7 +18,7 @@ async function elderFor(deviceToken: string) {
   const db = await admin();
   const { data } = await db
     .from("elders")
-    .select("id, name, sharing_paused, last_checkin_date, paired_at")
+    .select("id, name, owner_id, sharing_paused, last_checkin_date, paired_at")
     .eq("device_token", deviceToken)
     .maybeSingle();
   if (!data || !data.paired_at) throw new Error("This phone is not paired");
@@ -85,6 +85,7 @@ export const checkIn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db, elder } = await elderFor(data.deviceToken);
     await db.from("elders").update({ last_checkin_date: data.day, last_active_at: new Date().toISOString() }).eq("id", elder.id);
+    await db.from("checkins").upsert({ elder_id: elder.id, day: data.day }, { onConflict: "elder_id,day", ignoreDuplicates: true });
     return { ok: true };
   });
 
@@ -105,6 +106,18 @@ export const sendSos = createServerFn({ method: "POST" })
       elder_id: elder.id,
       ...(hasLoc ? { latitude: data.latitude, longitude: data.longitude, accuracy_m: data.accuracy ?? null } : {}),
     } as never);
+    // Push alert to the family's phones (works even when their app is closed).
+    try {
+      const { sendToFamily } = await import("./push.server");
+      await sendToFamily(db, elder.owner_id, "sos", {
+        title: `SOS: ${elder.name} needs help`,
+        body: hasLoc ? "Tap to see where they are." : "Tap to open FamilyCare. Location not available.",
+        url: "/family",
+        tag: `sos-${elder.id}-${Date.now()}`,
+      });
+    } catch (e) {
+      console.error("SOS push failed", e);
+    }
     return { ok: true };
   });
 
