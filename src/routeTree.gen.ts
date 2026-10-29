@@ -15,6 +15,8 @@ import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ElderRouteImport } from './routes/elder'
 import { Route as PairRouteImport } from './routes/pair'
 import { Route as AuthenticatedFamilyRouteImport } from './routes/_authenticated/family'
+import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
+import { Route as AuthenticatedAskIdRouteImport } from './routes/_authenticated/ask.$id'
 import { Route as AuthenticatedElderSetupIdRouteImport } from './routes/_authenticated/elder-setup.$id'
 import { Route as ApiPublicJobsCheckAlertsRouteImport } from './routes/api/public/jobs/check-alerts'
 
@@ -47,6 +49,16 @@ const AuthenticatedFamilyRoute = AuthenticatedFamilyRouteImport.update({
   path: '/family',
   getParentRoute: () => AuthenticatedRouteRoute,
 } as any)
+const AuthenticatedSettingsRoute = AuthenticatedSettingsRouteImport.update({
+  id: '/settings',
+  path: '/settings',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
+const AuthenticatedAskIdRoute = AuthenticatedAskIdRouteImport.update({
+  id: '/ask/$id',
+  path: '/ask/$id',
+  getParentRoute: () => AuthenticatedRouteRoute,
+} as any)
 const AuthenticatedElderSetupIdRoute =
   AuthenticatedElderSetupIdRouteImport.update({
     id: '/elder-setup/$id',
@@ -66,6 +78,8 @@ export interface FileRoutesByFullPath {
   '/elder': typeof ElderRoute
   '/pair': typeof PairRoute
   '/family': typeof AuthenticatedFamilyRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/ask/$id': typeof AuthenticatedAskIdRoute
   '/elder-setup/$id': typeof AuthenticatedElderSetupIdRoute
   '/api/public/jobs/check-alerts': typeof ApiPublicJobsCheckAlertsRoute
 }
@@ -75,6 +89,8 @@ export interface FileRoutesByTo {
   '/elder': typeof ElderRoute
   '/pair': typeof PairRoute
   '/family': typeof AuthenticatedFamilyRoute
+  '/settings': typeof AuthenticatedSettingsRoute
+  '/ask/$id': typeof AuthenticatedAskIdRoute
   '/elder-setup/$id': typeof AuthenticatedElderSetupIdRoute
   '/api/public/jobs/check-alerts': typeof ApiPublicJobsCheckAlertsRoute
 }
@@ -86,6 +102,8 @@ export interface FileRoutesById {
   '/elder': typeof ElderRoute
   '/pair': typeof PairRoute
   '/_authenticated/family': typeof AuthenticatedFamilyRoute
+  '/_authenticated/settings': typeof AuthenticatedSettingsRoute
+  '/_authenticated/ask/$id': typeof AuthenticatedAskIdRoute
   '/_authenticated/elder-setup/$id': typeof AuthenticatedElderSetupIdRoute
   '/api/public/jobs/check-alerts': typeof ApiPublicJobsCheckAlertsRoute
 }
@@ -97,6 +115,8 @@ export interface FileRouteTypes {
     | '/elder'
     | '/pair'
     | '/family'
+    | '/settings'
+    | '/ask/$id'
     | '/elder-setup/$id'
     | '/api/public/jobs/check-alerts'
   fileRoutesByTo: FileRoutesByTo
@@ -106,6 +126,8 @@ export interface FileRouteTypes {
     | '/elder'
     | '/pair'
     | '/family'
+    | '/settings'
+    | '/ask/$id'
     | '/elder-setup/$id'
     | '/api/public/jobs/check-alerts'
   id:
@@ -116,6 +138,8 @@ export interface FileRouteTypes {
     | '/elder'
     | '/pair'
     | '/_authenticated/family'
+    | '/_authenticated/settings'
+    | '/_authenticated/ask/$id'
     | '/_authenticated/elder-setup/$id'
     | '/api/public/jobs/check-alerts'
   fileRoutesById: FileRoutesById
@@ -173,6 +197,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedFamilyRouteImport
       parentRoute: typeof AuthenticatedRouteRoute
     }
+    '/_authenticated/settings': {
+      id: '/_authenticated/settings'
+      path: '/settings'
+      fullPath: '/settings'
+      preLoaderRoute: typeof AuthenticatedSettingsRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
+    '/_authenticated/ask/$id': {
+      id: '/_authenticated/ask/$id'
+      path: '/ask/$id'
+      fullPath: '/ask/$id'
+      preLoaderRoute: typeof AuthenticatedAskIdRouteImport
+      parentRoute: typeof AuthenticatedRouteRoute
+    }
     '/_authenticated/elder-setup/$id': {
       id: '/_authenticated/elder-setup/$id'
       path: '/elder-setup/$id'
@@ -192,11 +230,15 @@ declare module '@tanstack/react-router' {
 
 interface AuthenticatedRouteRouteChildren {
   AuthenticatedFamilyRoute: typeof AuthenticatedFamilyRoute
+  AuthenticatedSettingsRoute: typeof AuthenticatedSettingsRoute
+  AuthenticatedAskIdRoute: typeof AuthenticatedAskIdRoute
   AuthenticatedElderSetupIdRoute: typeof AuthenticatedElderSetupIdRoute
 }
 
 const AuthenticatedRouteRouteChildren: AuthenticatedRouteRouteChildren = {
   AuthenticatedFamilyRoute: AuthenticatedFamilyRoute,
+  AuthenticatedSettingsRoute: AuthenticatedSettingsRoute,
+  AuthenticatedAskIdRoute: AuthenticatedAskIdRoute,
   AuthenticatedElderSetupIdRoute: AuthenticatedElderSetupIdRoute,
 }
 
