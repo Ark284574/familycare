@@ -47,10 +47,10 @@ export function shouldNotify(kind: AlertKind, s: NotifySettings, nowHHMM: string
 
 /** Local date ("YYYY-MM-DD") and time ("HH:MM") in a time zone. */
 export function localNow(timeZone: string, d = new Date()) {
-  const parts = Object.fromEntries(
+  const parts: Record<string, string> = Object.fromEntries(
     new Intl.DateTimeFormat("en-GB", { timeZone, year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23" })
       .formatToParts(d)
       .map((p) => [p.type, p.value]),
   );
-  return { day: `${parts.year}-${parts.month}-${parts.day}`, time: `${parts.hour}:${parts.minute}` };
+  return { day: `${parts['year']}-${parts['month']}-${parts['day']}`, time: `${parts['hour']}:${parts['minute']}` };
 }

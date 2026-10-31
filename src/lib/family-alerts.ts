@@ -35,8 +35,9 @@ export async function subscribePush() {
   let sub = await reg.pushManager.getSubscription();
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC_KEY) });
   const j = sub.toJSON();
-  if (!j.endpoint || !j.keys?.p256dh || !j.keys?.auth) return false;
-  await savePushSubscription({ data: { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth } });
+  const p256dh = j.keys?.["p256dh"], auth = j.keys?.["auth"];
+  if (!j.endpoint || !p256dh || !auth) return false;
+  await savePushSubscription({ data: { endpoint: j.endpoint, p256dh, auth } });
   return true;
 }
 
@@ -76,4 +77,15 @@ export function playSiren() {
     o.stop(ctx.currentTime + 2.4);
     o.onended = () => void ctx.close();
   } catch { /* audio blocked */ }
+}
+
+// Gentle in-page alert (no siren): a dose is still "not confirmed" after the grace period.
+export async function showDoseNotification(name: string, medName: string, time: string) {
+  if (!notificationsSupported() || Notification.permission !== "granted") return;
+  const title = `${name}: ${medName} not confirmed`;
+  const body = `The ${time} dose has not been confirmed yet. Maybe give them a call.`;
+  const tag = `dose-${name}-${medName}-${time}`;
+  const reg = await registration();
+  if (reg) await reg.showNotification(title, { body, tag, data: { url: "/family" } });
+  else new Notification(title, { body, tag });
 }

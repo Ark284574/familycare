@@ -42,8 +42,9 @@ function Settings() {
     setPerm(notificationsSupported() ? Notification.permission : "unsupported");
     void (async () => {
       const { data } = await supabase.from("notification_settings").select("*").maybeSingle();
-      if (data) setS({ ...DEFAULT_SETTINGS, ...data });
-      else setS({ ...DEFAULT_SETTINGS, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_SETTINGS.timezone });
+      // Always use this phone's own time zone for quiet hours.
+      const tz = Intl.DateTimeFormat().resolvedOptions().timeZone || DEFAULT_SETTINGS.timezone;
+      setS({ ...DEFAULT_SETTINGS, ...(data ?? {}), timezone: tz });
       if (Notification?.permission === "granted") void subscribePush().catch(() => {});
     })();
   }, []);
