@@ -8,7 +8,7 @@ type Db = Awaited<typeof import("@/integrations/supabase/client.server")>["supab
 export type PushPayload = { title: string; body: string; url: string; tag: string };
 
 export async function sendToFamily(db: Db, ownerId: string, kind: AlertKind, payload: PushPayload) {
-  const jwk = process.env.VAPID_PRIVATE_JWK;
+  const jwk = process.env['VAPID_PRIVATE_JWK'];
   if (!jwk) return { sent: 0, skipped: "no-key" as const };
 
   const { data: s } = await db.from("notification_settings").select("*").eq("user_id", ownerId).maybeSingle();

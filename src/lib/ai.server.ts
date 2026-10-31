@@ -20,7 +20,7 @@ export class AiError extends Error {
 }
 
 export async function askModel(instructions: string, question: string) {
-  const apiKey = process.env.LOVABLE_API_KEY;
+  const apiKey = process.env['LOVABLE_API_KEY'];
   if (!apiKey) throw new AiError("AI is not set up yet.", 401);
   const provider = createOpenAI({
     baseURL: "https://ai.gateway.lovable.dev/v1",

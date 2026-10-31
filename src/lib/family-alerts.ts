@@ -35,8 +35,9 @@ export async function subscribePush() {
   let sub = await reg.pushManager.getSubscription();
   if (!sub) sub = await reg.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: b64ToBytes(VAPID_PUBLIC_KEY) });
   const j = sub.toJSON();
-  if (!j.endpoint || !j.keys?.p256dh || !j.keys?.auth) return false;
-  await savePushSubscription({ data: { endpoint: j.endpoint, p256dh: j.keys.p256dh, auth: j.keys.auth } });
+  const p256dh = j.keys?.["p256dh"], auth = j.keys?.["auth"];
+  if (!j.endpoint || !p256dh || !auth) return false;
+  await savePushSubscription({ data: { endpoint: j.endpoint, p256dh, auth } });
   return true;
 }
 
