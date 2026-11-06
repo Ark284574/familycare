@@ -6,5 +6,5 @@
 - [x] Web push: SOS + dose alerts even when dashboard is closed
 - [x] Notification settings: choose alerts + quiet hours
 - [x] AI "Ask about Mom" Q&A grounded in medication/check-in records
-- [ ] Option A: Flutter + Firebase code export
-- [ ] Milestone 4: Demo script and real-device test checklist
+- [x] Option A: Flutter + Firebase code export
+- [x] Milestone 4: Demo script and real-device test checklist
