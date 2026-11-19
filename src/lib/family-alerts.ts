@@ -1,5 +1,8 @@
 // Family-side alerts: push subscription, in-page notifications and a siren.
 import { savePushSubscription } from "./family.functions";
+import { matchesSosNotification } from "./sos-alerts";
+
+const inPageSosNotifications = new Map<string, { elderId: string; notification: Notification }>();
 
 // Public half of the push key pair (safe to ship to browsers).
 export const VAPID_PUBLIC_KEY = "BBJxdwt-2pPkv_C9QY-XHFQ8MJlct7g5Swc32BZeCCHI6LM0BnRbljeQ1nFMuiLYhCiMUbouV5jRl_Y1IClEjWA";
@@ -48,18 +51,32 @@ export async function enableNotifications(): Promise<NotificationPermission> {
   return p;
 }
 
-export async function showSosNotification(name: string, sosId: string, hasLocation: boolean) {
+export async function showSosNotification(name: string, sosId: string, elderId: string, hasLocation: boolean) {
   if (!notificationsSupported() || Notification.permission !== "granted") return;
   const url = `/family#sos-${sosId}`;
   const title = `SOS: ${name} needs help`;
   const body = hasLocation ? "Tap to open the dashboard and see their location." : "Tap to open the dashboard. Location not available.";
   const reg = await registration();
   if (reg) {
-    await reg.showNotification(title, { body, tag: `sos-${sosId}`, requireInteraction: true, data: { url } });
+    await reg.showNotification(title, { body, tag: `sos-${sosId}`, requireInteraction: true, data: { url, sosId, elderId } });
   } else {
-    const n = new Notification(title, { body, tag: `sos-${sosId}`, requireInteraction: true });
+    const n = new Notification(title, { body, tag: `sos-${sosId}`, requireInteraction: true, data: { sosId, elderId } });
+    inPageSosNotifications.set(sosId, { elderId, notification: n });
     n.onclick = () => { window.focus(); window.location.hash = `sos-${sosId}`; n.close(); };
   }
+}
+
+/** Ask this phone's service worker to dismiss the matching SOS notification now. */
+export async function closeSosNotification(sosId: string, elderId: string) {
+  for (const [id, entry] of inPageSosNotifications) {
+    if (matchesSosNotification({ tag: entry.notification.tag, data: { sosId: id, elderId: entry.elderId } }, { sosId, elderId })) {
+      entry.notification.close();
+      inPageSosNotifications.delete(id);
+    }
+  }
+  const reg = await registration();
+  const worker = navigator.serviceWorker.controller ?? reg?.active;
+  worker?.postMessage({ type: "clear-sos", sosId, elderId });
 }
 
 export function playSiren() {

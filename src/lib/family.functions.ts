@@ -3,6 +3,47 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+// Resolve one SOS for its family and send a close signal to their other phones.
+export const resolveFamilySos = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ sosId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: sos, error: sosError } = await context.supabase
+      .from("sos_events")
+      .select("id, elder_id")
+      .eq("id", data.sosId)
+      .maybeSingle();
+    if (sosError) throw new Error("Could not update the SOS alert");
+    if (!sos) return { ok: false as const };
+
+    const { data: elder, error: elderError } = await context.supabase
+      .from("elders")
+      .select("owner_id")
+      .eq("id", sos.elder_id)
+      .maybeSingle();
+    if (elderError || !elder || elder.owner_id !== context.userId) throw new Error("SOS alert not found");
+
+    const { data: active, error: activeError } = await context.supabase
+      .from("sos_events")
+      .select("id")
+      .eq("elder_id", sos.elder_id)
+      .eq("resolved", false);
+    if (activeError) throw new Error("Could not update the SOS alert");
+
+    const ids = (active ?? []).map((event) => event.id);
+    if (!ids.length) return { ok: true as const };
+    const { error: updateError } = await context.supabase
+      .from("sos_events")
+      .update({ resolved: true })
+      .in("id", ids);
+    if (updateError) throw new Error("Could not update the SOS alert");
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { sendSosClearToFamily } = await import("./push.server");
+    await sendSosClearToFamily(supabaseAdmin, context.userId, sos.elder_id, ids);
+    return { ok: true as const };
+  });
+
 // Save this phone's push subscription so alerts arrive even when the app is closed.
 export const savePushSubscription = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])

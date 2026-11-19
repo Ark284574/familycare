@@ -15,7 +15,7 @@ import {
   toMin,
   prettyTime,
 } from "@/lib/elder-store";
-import { getElderToday, confirmDose, checkIn, sendSos, setSharingPaused } from "@/lib/elder.functions";
+import { getElderToday, confirmDose, checkIn, sendSos, resolveSosForDevice, setSharingPaused } from "@/lib/elder.functions";
 import { speak, chime } from "@/lib/speech";
 
 export const Route = createFileRoute("/elder")({
@@ -42,7 +42,9 @@ function ElderScreen() {
   const [offset, setOffset] = useState(0); // demo only: shifts the clock forward (minutes)
   const [view, setView] = useState<"home" | "privacy">("home");
   const [sosSent, setSosSent] = useState(false);
+  const [sosSending, setSosSending] = useState(false);
   const [sosLocated, setSosLocated] = useState(false);
+  const sosPendingRef = useRef(false);
   const spokenRef = useRef<Record<string, number>>({});
 
   const clock = new Date(now.getTime() + offset * 60000);
@@ -57,6 +59,7 @@ function ElderScreen() {
       try {
         const r = await getElderToday({ data: { deviceToken: t, day } });
         setToday({ name: r.name, meds: r.medicines, confirmed: r.confirmed, checkedIn: r.checkedIn, paused: r.paused });
+        if (!sosPendingRef.current) setSosSent(r.activeSos);
       } catch {
         setDeviceToken(null); // pairing was removed by family
         setToken(null);
@@ -75,9 +78,9 @@ function ElderScreen() {
   // Tick every 15 s; re-sync with the cloud every minute (picks up family edits).
   useEffect(() => {
     const a = setInterval(() => setNow(new Date()), 15000);
-    const b = setInterval(() => void refresh(), 60000);
+    const b = setInterval(() => void refresh(), sosSent ? 3000 : 60000);
     return () => { clearInterval(a); clearInterval(b); };
-  }, [refresh]);
+  }, [refresh, sosSent]);
 
   // Keep the screen awake so spoken reminders can play.
   useEffect(() => {
@@ -195,9 +198,11 @@ function ElderScreen() {
 
       <SosButton
         sent={sosSent}
+        sending={sosSending}
         located={sosLocated}
         onSend={() => {
-          setSosSent(true);
+          sosPendingRef.current = true;
+          setSosSending(true);
           setSosLocated(false);
           speak("Help is on the way. Your family has been alerted.");
           // Ask for location once, only now. Never wait more than 8 s; send anyway.
@@ -206,7 +211,16 @@ function ElderScreen() {
             if (done) return;
             done = true;
             if (c) setSosLocated(true);
-            if (token) void sendSos({ data: { deviceToken: token, ...(c ? { latitude: c.latitude, longitude: c.longitude, accuracy: c.accuracy } : {}) } });
+            if (token) {
+              void sendSos({ data: { deviceToken: token, ...(c ? { latitude: c.latitude, longitude: c.longitude, accuracy: c.accuracy } : {}) } })
+                .then((result) => { if (sosPendingRef.current) setSosSent(result.ok); })
+                .catch(() => { if (sosPendingRef.current) setSosSent(false); })
+                .finally(() => { sosPendingRef.current = false; setSosSending(false); });
+            } else {
+              sosPendingRef.current = false;
+              setSosSending(false);
+              setSosSent(true);
+            }
           };
           const fallback = window.setTimeout(() => send(), 8500);
           if (!navigator.geolocation) { clearTimeout(fallback); send(); return; }
@@ -216,7 +230,19 @@ function ElderScreen() {
             { enableHighAccuracy: true, timeout: 8000, maximumAge: 60000 },
           );
         }}
-        onReset={() => { setSosSent(false); setSosLocated(false); }}
+        onReset={async () => {
+          if (token) {
+            try {
+              await resolveSosForDevice({ data: { deviceToken: token } });
+            } catch {
+              return;
+            }
+          }
+          sosPendingRef.current = false;
+          setSosSending(false);
+          setSosSent(false);
+          setSosLocated(false);
+        }}
       />
 
       <button onClick={() => setView("privacy")} className="flex items-center justify-center gap-3 rounded-2xl border-2 border-border py-4 text-elder-sm font-semibold">
@@ -252,7 +278,7 @@ function Pill({ color }: { color: string }) {
 }
 
 // SOS needs a 3-second hold so it is not pressed by accident.
-function SosButton({ sent, located, onSend, onReset }: { sent: boolean; located: boolean; onSend: () => void; onReset: () => void }) {
+function SosButton({ sent, sending, located, onSend, onReset }: { sent: boolean; sending: boolean; located: boolean; onSend: () => void; onReset: () => void | Promise<void> }) {
   const [progress, setProgress] = useState(0);
   const timer = useRef<number | null>(null);
   const stop = () => {
@@ -275,6 +301,14 @@ function SosButton({ sent, located, onSend, onReset }: { sent: boolean; located:
         <p className="text-elder-lg font-extrabold text-destructive">{located ? "Family alerted — location shared" : "Family alerted"}</p>
         <p className="text-elder-sm">Help is on the way.</p>
         <button onClick={onReset} className="mt-3 rounded-xl border-2 px-5 py-3 text-elder-sm font-semibold">I'm fine now</button>
+      </div>
+    );
+  }
+  if (sending) {
+    return (
+      <div className="rounded-3xl border-4 border-destructive bg-destructive/10 p-6 text-center" role="status" aria-live="polite">
+        <p className="text-elder-lg font-extrabold text-destructive">Sending SOS…</p>
+        <p className="text-elder-sm">Your family will be alerted now.</p>
       </div>
     );
   }

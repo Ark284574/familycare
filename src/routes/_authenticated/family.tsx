@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { enableNotifications, notificationsSupported, playSiren, showDoseNotification, showSosNotification } from "@/lib/family-alerts";
+import { useServerFn } from "@tanstack/react-start";
+import { closeSosNotification, enableNotifications, notificationsSupported, playSiren, showDoseNotification, showSosNotification } from "@/lib/family-alerts";
 import { supabase } from "@/integrations/supabase/client";
 import { dayKey } from "@/lib/elder-store";
 import { todayStatus, type Status } from "@/lib/status";
+import { resolveFamilySos } from "@/lib/family.functions";
 
 export const Route = createFileRoute("/_authenticated/family")({
   head: () => ({
@@ -39,6 +41,7 @@ function Dashboard() {
 
   const [perm, setPerm] = useState<NotificationPermission | "unsupported">("default");
   const seenSos = useRef<Set<string> | null>(null);
+  const resolveSos = useServerFn(resolveFamilySos);
 
   useEffect(() => {
     setPerm(notificationsSupported() ? Notification.permission : "unsupported");
@@ -60,7 +63,7 @@ function Dashboard() {
         if (!seenSos.current.has(x.id)) {
           const name = elderList.find((el) => el.id === x.elder_id)?.name ?? "Your parent";
           playSiren();
-          void showSosNotification(name, x.id, x.latitude != null);
+          void showSosNotification(name, x.id, x.elder_id, x.latitude != null);
         }
       }
     }
@@ -167,7 +170,13 @@ function Dashboard() {
                     </>
                   ) : <p className="text-sm font-normal">Location not available</p>}
                 </div>
-                <button className="rounded-md bg-card px-3 py-1 text-sm text-foreground" onClick={async () => { await supabase.from("sos_events").update({ resolved: true }).eq("id", s.id); void load(); }}>
+                <button className="rounded-md bg-card px-3 py-1 text-sm text-foreground" onClick={async () => {
+                  const result = await resolveSos({ data: { sosId: s.id } });
+                  if (result.ok) {
+                    await closeSosNotification(s.id, s.elder_id);
+                    void load();
+                  }
+                }}>
                   I've handled it
                 </button>
               </div>

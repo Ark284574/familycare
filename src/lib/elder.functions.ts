@@ -48,14 +48,16 @@ export const getElderToday = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db, elder } = await elderFor(data.deviceToken);
     await db.from("elders").update({ last_active_at: new Date().toISOString() }).eq("id", elder.id);
-    const [{ data: meds }, { data: events }] = await Promise.all([
+    const [{ data: meds }, { data: events }, { data: activeSos }] = await Promise.all([
       db.from("medicines").select("id, name, dose, time, note, color").eq("elder_id", elder.id).order("time"),
       db.from("dose_events").select("medicine_id, confirmed_at").eq("elder_id", elder.id).eq("day", data.day),
+      db.from("sos_events").select("id").eq("elder_id", elder.id).eq("resolved", false),
     ]);
     return {
       name: elder.name,
       paused: elder.sharing_paused,
       checkedIn: elder.last_checkin_date === data.day,
+      activeSos: (activeSos ?? []).length > 0,
       medicines: meds ?? [],
       confirmed: Object.fromEntries((events ?? []).map((e) => [e.medicine_id, e.confirmed_at])),
     };
@@ -102,21 +104,45 @@ export const sendSos = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { db, elder } = await elderFor(data.deviceToken);
     const hasLoc = data.latitude !== undefined && data.longitude !== undefined;
-    await db.from("sos_events").insert({
+    const { data: sos, error } = await db.from("sos_events").insert({
       elder_id: elder.id,
       ...(hasLoc ? { latitude: data.latitude, longitude: data.longitude, accuracy_m: data.accuracy ?? null } : {}),
-    } as never);
+    } as never).select("id").single();
+    if (error || !sos) throw new Error("Could not send the SOS alert");
     // Push alert to the family's phones (works even when their app is closed).
     try {
       const { sendToFamily } = await import("./push.server");
       await sendToFamily(db, elder.owner_id, "sos", {
         title: `SOS: ${elder.name} needs help`,
         body: hasLoc ? "Tap to see where they are." : "Tap to open FamilyCare. Location not available.",
-        url: "/family",
-        tag: `sos-${elder.id}-${Date.now()}`,
+        url: `/family#sos-${sos.id}`,
+        tag: `sos-${sos.id}`,
+        data: { sosId: sos.id, elderId: elder.id },
       });
     } catch (e) {
       console.error("SOS push failed", e);
+    }
+    return { ok: true, sosId: sos.id };
+  });
+
+// The paired elder can mark all currently active SOS alerts as resolved.
+export const resolveSosForDevice = createServerFn({ method: "POST" })
+  .inputValidator((d) => z.object({ deviceToken: token }).parse(d))
+  .handler(async ({ data }) => {
+    const { db, elder } = await elderFor(data.deviceToken);
+    const { data: active, error: readError } = await db
+      .from("sos_events")
+      .select("id")
+      .eq("elder_id", elder.id)
+      .eq("resolved", false);
+    if (readError) throw new Error("Could not update the SOS alert");
+
+    const ids = (active ?? []).map((event) => event.id);
+    if (ids.length) {
+      const { error } = await db.from("sos_events").update({ resolved: true }).in("id", ids);
+      if (error) throw new Error("Could not update the SOS alert");
+      const { sendSosClearToFamily } = await import("./push.server");
+      await sendSosClearToFamily(db, elder.owner_id, elder.id, ids);
     }
     return { ok: true };
   });

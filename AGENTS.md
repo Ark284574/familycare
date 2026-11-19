@@ -14,4 +14,5 @@
 - Background alerts use web push (VAPID, `@pushforge/builder`, works on the Worker runtime) sent from `src/lib/push.server.ts`; `public/notify-sw.js` only handles push/notification clicks and must never cache. Why: avoid stale-preview service worker problems.
 - Alert rules (which alerts, quiet hours) live in pure `src/lib/quiet-hours.ts` with tests. Why: one tested source for both the server and the UI.
 - Dose and check-in alerts come from one managed schedule calling `/api/public/jobs/check-alerts`; `alerts_sent` keys make each alert send once. Why: avoid duplicate pushes.
+- SOS resolution is handled by token-verified elder and authenticated family functions; clear pushes dismiss matching notifications on family phones. Why: either side can end one shared emergency alert.
 - The AI Q&A sends the model only the family's own records (read through RLS as that user) and tells it to answer only from them. Why: answers must be grounded and private.
