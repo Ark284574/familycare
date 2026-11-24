@@ -16,3 +16,4 @@
 - Dose and check-in alerts come from one managed schedule calling `/api/public/jobs/check-alerts`; `alerts_sent` keys make each alert send once. Why: avoid duplicate pushes.
 - SOS resolution is handled by token-verified elder and authenticated family functions; clear pushes dismiss matching notifications on family phones. Why: either side can end one shared emergency alert.
 - The AI Q&A sends the model only the family's own records (read through RLS as that user) and tells it to answer only from them. Why: answers must be grounded and private.
+- Family access uses elder-scoped membership records: owners manage medicines and invites; members get read access and can resolve SOS alerts. Why: shared care without shared medicine-editing authority.

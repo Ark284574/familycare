@@ -8,3 +8,4 @@
 - [x] AI "Ask about Mom" Q&A grounded in medication/check-in records
 - [x] Option A: Flutter + Firebase code export
 - [x] Milestone 4: Demo script and real-device test checklist
+- [ ] Family Circle: direct invite links, owner-only medicine editing, shared SOS alerts and resolution
