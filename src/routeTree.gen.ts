@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as AuthRouteImport } from './routes/auth'
 import { Route as ElderRouteImport } from './routes/elder'
+import { Route as JoinRouteImport } from './routes/join'
 import { Route as PairRouteImport } from './routes/pair'
 import { Route as AuthenticatedFamilyRouteImport } from './routes/_authenticated/family'
 import { Route as AuthenticatedSettingsRouteImport } from './routes/_authenticated/settings'
@@ -37,6 +38,11 @@ const AuthRoute = AuthRouteImport.update({
 const ElderRoute = ElderRouteImport.update({
   id: '/elder',
   path: '/elder',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const JoinRoute = JoinRouteImport.update({
+  id: '/join',
+  path: '/join',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PairRoute = PairRouteImport.update({
@@ -76,6 +82,7 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/elder': typeof ElderRoute
+  '/join': typeof JoinRoute
   '/pair': typeof PairRoute
   '/family': typeof AuthenticatedFamilyRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -87,6 +94,7 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/auth': typeof AuthRoute
   '/elder': typeof ElderRoute
+  '/join': typeof JoinRoute
   '/pair': typeof PairRoute
   '/family': typeof AuthenticatedFamilyRoute
   '/settings': typeof AuthenticatedSettingsRoute
@@ -100,6 +108,7 @@ export interface FileRoutesById {
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
   '/auth': typeof AuthRoute
   '/elder': typeof ElderRoute
+  '/join': typeof JoinRoute
   '/pair': typeof PairRoute
   '/_authenticated/family': typeof AuthenticatedFamilyRoute
   '/_authenticated/settings': typeof AuthenticatedSettingsRoute
@@ -113,6 +122,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/elder'
+    | '/join'
     | '/pair'
     | '/family'
     | '/settings'
@@ -124,6 +134,7 @@ export interface FileRouteTypes {
     | '/'
     | '/auth'
     | '/elder'
+    | '/join'
     | '/pair'
     | '/family'
     | '/settings'
@@ -136,6 +147,7 @@ export interface FileRouteTypes {
     | '/_authenticated'
     | '/auth'
     | '/elder'
+    | '/join'
     | '/pair'
     | '/_authenticated/family'
     | '/_authenticated/settings'
@@ -149,6 +161,7 @@ export interface RootRouteChildren {
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
   AuthRoute: typeof AuthRoute
   ElderRoute: typeof ElderRoute
+  JoinRoute: typeof JoinRoute
   PairRoute: typeof PairRoute
   ApiPublicJobsCheckAlertsRoute: typeof ApiPublicJobsCheckAlertsRoute
 }
@@ -181,6 +194,13 @@ declare module '@tanstack/react-router' {
       path: '/elder'
       fullPath: '/elder'
       preLoaderRoute: typeof ElderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/join': {
+      id: '/join'
+      path: '/join'
+      fullPath: '/join'
+      preLoaderRoute: typeof JoinRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/pair': {
@@ -250,6 +270,7 @@ const rootRouteChildren: RootRouteChildren = {
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
   AuthRoute: AuthRoute,
   ElderRoute: ElderRoute,
+  JoinRoute: JoinRoute,
   PairRoute: PairRoute,
   ApiPublicJobsCheckAlertsRoute: ApiPublicJobsCheckAlertsRoute,
 }

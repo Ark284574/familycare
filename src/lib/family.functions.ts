@@ -3,6 +3,11 @@ import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
 import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
+async function hashInviteToken(token: string) {
+  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(token));
+  return Array.from(new Uint8Array(digest), (byte) => byte.toString(16).padStart(2, "0")).join("");
+}
+
 // Resolve one SOS for its family and send a close signal to their other phones.
 export const resolveFamilySos = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
@@ -16,14 +21,10 @@ export const resolveFamilySos = createServerFn({ method: "POST" })
     if (sosError) throw new Error("Could not update the SOS alert");
     if (!sos) return { ok: false as const };
 
-    const { data: elder, error: elderError } = await context.supabase
-      .from("elders")
-      .select("owner_id")
-      .eq("id", sos.elder_id)
-      .maybeSingle();
-    if (elderError || !elder || elder.owner_id !== context.userId) throw new Error("SOS alert not found");
-
-    const { data: active, error: activeError } = await context.supabase
+    // The SOS lookup above is scoped by row access, so any linked family member
+    // can respond while unrelated accounts cannot reach this point.
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const { data: active, error: activeError } = await supabaseAdmin
       .from("sos_events")
       .select("id")
       .eq("elder_id", sos.elder_id)
@@ -32,16 +33,125 @@ export const resolveFamilySos = createServerFn({ method: "POST" })
 
     const ids = (active ?? []).map((event) => event.id);
     if (!ids.length) return { ok: true as const };
-    const { error: updateError } = await context.supabase
+    const { error: updateError } = await supabaseAdmin
       .from("sos_events")
       .update({ resolved: true })
       .in("id", ids);
     if (updateError) throw new Error("Could not update the SOS alert");
 
-    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { sendSosClearToFamily } = await import("./push.server");
-    await sendSosClearToFamily(supabaseAdmin, context.userId, sos.elder_id, ids);
+    await sendSosClearToFamily(supabaseAdmin, sos.elder_id, ids);
     return { ok: true as const };
+  });
+
+// Create a single-use-free family invite link that expires after 30 days.
+export const issueFamilyInvite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ elderId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: elder, error: elderError } = await context.supabase
+      .from("elders")
+      .select("owner_id")
+      .eq("id", data.elderId)
+      .maybeSingle();
+    if (elderError || !elder || elder.owner_id !== context.userId) throw new Error("Only the owner can invite family members");
+
+    const token = crypto.randomUUID().replaceAll("-", "");
+    const tokenHash = await hashInviteToken(token);
+    const now = new Date();
+    const expiresAt = new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000).toISOString();
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const adminDb = supabaseAdmin as unknown as { from: (table: string) => any };
+    const { error: revokeError } = await adminDb.from("family_invites")
+      .update({ revoked_at: now.toISOString() })
+      .eq("elder_id", data.elderId)
+      .is("revoked_at", null);
+    if (revokeError) throw new Error("Could not refresh the invite link");
+    const { error: insertError } = await adminDb.from("family_invites").insert({
+      elder_id: data.elderId,
+      created_by: context.userId,
+      token_hash: tokenHash,
+      expires_at: expiresAt,
+    });
+    if (insertError) throw new Error("Could not create the invite link");
+    return { token, expiresAt };
+  });
+
+export const revokeFamilyInvite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ elderId: z.string().uuid() }).parse(d))
+  .handler(async ({ data, context }) => {
+    const { data: elder, error: elderError } = await context.supabase
+      .from("elders")
+      .select("owner_id")
+      .eq("id", data.elderId)
+      .maybeSingle();
+    if (elderError || !elder || elder.owner_id !== context.userId) throw new Error("Only the owner can revoke invite links");
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const adminDb = supabaseAdmin as unknown as { from: (table: string) => any };
+    const { error } = await adminDb.from("family_invites")
+      .update({ revoked_at: new Date().toISOString() })
+      .eq("elder_id", data.elderId)
+      .is("revoked_at", null);
+    if (error) throw new Error("Could not revoke the invite link");
+    return { ok: true as const };
+  });
+
+// Public preview reveals only the elder's name to someone holding the invite token.
+export const previewFamilyInvite = createServerFn({ method: "GET" })
+  .inputValidator((d) => z.object({ token: z.string().min(32).max(128) }).parse(d))
+  .handler(async ({ data }) => {
+    const tokenHash = await hashInviteToken(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const adminDb = supabaseAdmin as unknown as { from: (table: string) => any };
+    const { data: invite, error } = await adminDb.from("family_invites")
+      .select("elder_id")
+      .eq("token_hash", tokenHash)
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (error || !invite) return { ok: false as const };
+    const { data: elder } = await supabaseAdmin.from("elders").select("name").eq("id", invite.elder_id).maybeSingle();
+    return elder ? { ok: true as const, elderName: elder.name } : { ok: false as const };
+  });
+
+export const joinFamilyInvite = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
+  .inputValidator((d) => z.object({ token: z.string().min(32).max(128) }).parse(d))
+  .handler(async ({ data, context }) => {
+    const tokenHash = await hashInviteToken(data.token);
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const adminDb = supabaseAdmin as unknown as { from: (table: string) => any };
+    const { data: invite, error } = await adminDb.from("family_invites")
+      .select("elder_id")
+      .eq("token_hash", tokenHash)
+      .is("revoked_at", null)
+      .gt("expires_at", new Date().toISOString())
+      .maybeSingle();
+    if (error || !invite) return { ok: false as const, error: "This invite link has expired or was revoked." };
+
+    const { data: existing, error: memberError } = await adminDb.from("elder_members")
+      .select("role")
+      .eq("elder_id", invite.elder_id)
+      .eq("user_id", context.userId)
+      .maybeSingle();
+    if (memberError) throw new Error("Could not check family access");
+    if (existing) return { ok: true as const, alreadyJoined: true };
+
+    const { error: joinError } = await adminDb.from("elder_members").insert({
+      elder_id: invite.elder_id,
+      user_id: context.userId,
+      role: "member",
+    });
+    if (joinError) {
+      const { data: racedMember } = await adminDb.from("elder_members")
+        .select("role")
+        .eq("elder_id", invite.elder_id)
+        .eq("user_id", context.userId)
+        .maybeSingle();
+      if (!racedMember) throw new Error("Could not join this family circle");
+    }
+    return { ok: true as const, alreadyJoined: false };
   });
 
 // Save this phone's push subscription so alerts arrive even when the app is closed.
@@ -65,7 +175,8 @@ export const sendTestPush = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { sendToFamily } = await import("./push.server");
     // Test uses the SOS rule so it isn't held back by quiet hours.
-    const r = await sendToFamily(supabaseAdmin, context.userId, "sos", {
+    const { sendToUser } = await import("./push.server");
+    const r = await sendToUser(supabaseAdmin, context.userId, "sos", {
       title: "FamilyCare test alert",
       body: "Alerts are working on this phone.",
       url: "/family",
